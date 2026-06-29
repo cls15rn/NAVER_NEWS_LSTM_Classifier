@@ -24,3 +24,4 @@ if __name__ == "__main__":
     # 최종 예측 결과를 화면에 출력한다.
     print("\n새 기사:", sample_news)
     print("예측 카테고리:", predicted_label)
+

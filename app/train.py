@@ -22,6 +22,11 @@ from app.data import load_sample_data
 from app.model import TextLSTMClassifier
 from app.preprocess import build_vocab, clean_text, encode_labels, pad_sequences, texts_to_sequences
 
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from matplotlib import pyplot as plt
+plt.rcParams["font.family"] = "Malgun Gothic"   # 한글 폰트 지정 (Windows)
+plt.rcParams["axes.unicode_minus"] = False      # 마이너스 기호 깨짐 방지
+
 
 def set_seed(seed: int) -> None:
     """학습 결과가 최대한 동일하게 재현되도록 난수를 고정한다."""
@@ -29,6 +34,16 @@ def set_seed(seed: int) -> None:
     random.seed(seed)              # 파이썬 random 모듈의 난수를 고정한다.
     np.random.seed(seed)           # NumPy 난수를 고정한다.
     torch.manual_seed(seed)        # PyTorch CPU 난수를 고정한다.
+
+
+def plot_confusion_matrix(y_true, y_pred, class_names=None):
+    cm = confusion_matrix(y_true, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(cmap="Blues", xticks_rotation=45)
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+    plt.savefig("confusion_matrix.png", dpi=150)
+    plt.show()
 
 
 def train_model(config: Config) -> Tuple[TextLSTMClassifier, Dict[str, object]]:
@@ -60,17 +75,36 @@ def train_model(config: Config) -> Tuple[TextLSTMClassifier, Dict[str, object]]:
     criterion = nn.CrossEntropyLoss()                                # 다중 분류 손실함수를 생성한다.
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate) # Adam 최적화 알고리즘을 설정한다.
 
-    for epoch in range(1, config.epochs + 1):                         # 지정한 epoch 수만큼 전체 학습 데이터를 반복 학습한다.
-        model.train()                                                 # 모델을 학습 모드로 전환한다.
-        total_loss = 0.0                                              # 한 epoch 동안의 손실 합계를 저장한다.
-        for batch_x, batch_y in train_loader:                         # 미니배치 단위로 입력과 정답을 꺼낸다.
-            optimizer.zero_grad()                                     # 이전 단계의 기울기를 초기화한다.
-            logits = model(batch_x)                                   # 모델이 각 클래스 점수를 예측한다.
-            loss = criterion(logits, batch_y)                         # 예측 점수와 정답 라벨을 비교하여 손실을 계산한다.
-            loss.backward()                                           # 손실을 기준으로 각 가중치의 기울기를 계산한다.
-            optimizer.step()                                          # 계산된 기울기를 사용하여 모델 가중치를 갱신한다.
-            total_loss += loss.item()                                 # 현재 배치 손실을 누적한다.
-        print(f"Epoch {epoch:02d}/{config.epochs} - loss: {total_loss / len(train_loader):.4f}") # epoch 평균 손실을 출력한다.
+    train_loss_history = []
+    val_loss_history = []
+
+    for epoch in range(1, config.epochs + 1):
+        # ---- 학습 단계 ----
+        model.train()
+        total_loss = 0.0
+        for batch_x, batch_y in train_loader:
+            optimizer.zero_grad()
+            logits = model(batch_x)
+            loss = criterion(logits, batch_y)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        train_loss = total_loss / len(train_loader)
+
+        # ---- 검증 단계 (test 데이터로 loss만 계산, 가중치 갱신 X) ----
+        model.eval()
+        val_total = 0.0
+        with torch.no_grad():
+            for batch_x, batch_y in test_loader:
+                logits = model(batch_x)
+                loss = criterion(logits, batch_y)
+                val_total += loss.item()
+        val_loss = val_total / len(test_loader)
+
+        # ---- 기록 & 출력 ----
+        train_loss_history.append(train_loss)
+        val_loss_history.append(val_loss)
+        print(f"Epoch {epoch:02d}/{config.epochs} - train_loss: {train_loss:.4f} | val_loss: {val_loss:.4f}")
 
     model.eval()                                                      # 모델을 평가 모드로 전환한다.
     all_preds = []                                                    # 전체 평가 예측값을 저장할 리스트이다.
@@ -92,4 +126,19 @@ def train_model(config: Config) -> Tuple[TextLSTMClassifier, Dict[str, object]]:
         pickle.dump({"vocab": vocab, "label_to_id": label_to_id, "id_to_label": id_to_label, "config": config}, f) # 사전과 라벨 정보를 저장한다.
 
     metadata = {"vocab": vocab, "label_to_id": label_to_id, "id_to_label": id_to_label, "accuracy": accuracy} # 호출자에게 반환할 메타데이터를 구성한다.
+
+    plot_confusion_matrix(all_targets, all_preds, class_names=["경제/기업", "사회", "연예"])
+    plot_loss_history(train_loss_history, val_loss_history)
+
     return model, metadata                                            # 학습된 모델과 메타데이터를 반환한다.
+
+
+def plot_loss_history(train_history, val_history):
+    epochs = range(1, len(train_history) + 1)
+    plt.figure()
+    plt.plot(epochs, train_history, marker="o", label="train_loss")
+    plt.plot(epochs, val_history, marker="o", label="val_loss")
+    plt.xlabel("Epoch"); plt.ylabel("Loss")
+    plt.title("Training / Validation Loss per Epoch")
+    plt.legend(); plt.grid(True); plt.tight_layout()
+    plt.savefig("loss_history.png", dpi=150); plt.show()
