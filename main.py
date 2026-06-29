@@ -16,7 +16,7 @@ if __name__ == "__main__":
     model, metadata = load_artifacts(config)
 
     # 새롭게 분류할 테스트 기사 문장을 준비한다.
-    sample_news = "The company released a new smartphone app with artificial intelligence security features"
+    sample_news = "최태원 SK하이닉스 서남권에 400조 반도체 총 1100조 투자"
 
     # 테스트 기사 문장을 모델에 입력하여 예측 카테고리를 얻는다.
     predicted_label = predict_text(sample_news, model, metadata, config)

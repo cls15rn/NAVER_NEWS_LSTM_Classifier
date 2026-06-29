@@ -42,6 +42,9 @@ def train_model(config: Config) -> Tuple[TextLSTMClassifier, Dict[str, object]]:
     x = pad_sequences(sequences, config.max_len)                       # 모든 기사 길이를 동일하게 패딩한다.
     y, label_to_id, id_to_label = encode_labels(labels)                # 문자열 카테고리를 정수 라벨로 변환한다.
 
+    from collections import Counter
+    print("라벨 분포:", Counter(y_train if 'y' not in dir() else y))
+
     x_train, x_test, y_train, y_test = train_test_split(               # 학습용 입력, 평가용 입력, 학습용 정답, 평가용 정답으로 사분할한다.
         x, y, test_size=config.test_size, random_state=config.random_state, stratify=y
     )

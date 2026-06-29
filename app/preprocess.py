@@ -8,17 +8,20 @@ from typing import Dict, Iterable, List, Tuple, Sequence
 
 import numpy as np
 
+from konlpy.tag import Okt
+_okt = Okt()
 
 STOP_WORDS = {
-    "the", "a", "an", "and", "or", "to", "of", "in", "on", "for", "with", "after", "as", "by", "at", "during",
+    "에", "더니", "한", "도", "로", "만에", "왜", "마저", "에서", "하자", "이", "까지", "는", "은", "가", "을", "를", "의", "와", "과",
+    "으로", "에서", "하다", "있다", "되다", "그", "저", "것",
 }
 
 
 def clean_text(text: str, remove_stopwords: bool = True) -> str:
     """영문 기사 문장에서 특수문자와 불필요한 단어를 제거한다."""
 
-    text = text.lower()
-    text = re.sub(r"[^a-z\s]", " ", text)
+    text = re.sub(r'[^가-힣ㄱ-ㅎㅏ-ㅣ\u4e00-\u9fffa-zA-Z0-9\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
     tokens = text.split()
     if remove_stopwords:
         tokens = [w for w in tokens if  w not in STOP_WORDS]
